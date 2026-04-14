@@ -12,4 +12,12 @@ export class MessagesService {
       ts: new Date().toISOString(),
     });
   }
+
+  publishStatus(state: string, details?: string): void {
+    this.gateway.sendStatus({
+      state,
+      details,
+      ts: new Date().toISOString(),
+    });
+  }
 }

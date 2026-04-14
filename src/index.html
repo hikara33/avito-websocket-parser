@@ -19,7 +19,8 @@
   </head>
   <body>
     <h1>Messages from Avito</h1>
-    <div id="status" class="meta">Connecting...</div>
+    <div id="status" class="meta">WebSocket: Connecting...</div>
+    <div id="avitoStatus" class="meta">Avito: waiting</div>
     <ul id="list"></ul>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
@@ -28,19 +29,25 @@
 
       const list = document.getElementById('list');
       const status = document.getElementById('status');
+      const avitoStatus = document.getElementById('avitoStatus');
 
       socket.on('connect', () => {
-        status.textContent = 'WebSocket connected';
+        status.textContent = 'WebSocket: connected';
       });
 
       socket.on('disconnect', () => {
-        status.textContent = 'WebSocket disconnected';
+        status.textContent = 'WebSocket: disconnected';
       });
 
       socket.on('message', (data) => {
         const li = document.createElement('li');
         li.textContent = '[' + (data.ts || new Date().toISOString()) + '] ' + data.from + ': ' + data.text;
         list.appendChild(li);
+      });
+
+      socket.on('status', (data) => {
+        const tail = data.details ? ' (' + data.details + ')' : '';
+        avitoStatus.textContent = 'Avito: ' + data.state + tail;
       });
     </script>
   </body>

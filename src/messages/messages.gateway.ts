@@ -21,4 +21,8 @@ export class MessagesGateway implements OnGatewayInit {
   sendMessage(data: any): void {
     this.server.emit('message', data);
   }
+
+  sendStatus(data: { state: string; details?: string; ts: string }): void {
+    this.server.emit('status', data);
+  }
 }
