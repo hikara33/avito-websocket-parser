@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Avito WS Stream</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 24px;
+      }
+      .meta {
+        color: #666;
+        margin-bottom: 12px;
+      }
+      li {
+        margin-bottom: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Messages from Avito</h1>
+    <div id="status" class="meta">Connecting...</div>
+    <ul id="list"></ul>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+      const socket = io('http://localhost:3000');
+
+      const list = document.getElementById('list');
+      const status = document.getElementById('status');
+
+      socket.on('connect', () => {
+        status.textContent = 'WebSocket connected';
+      });
+
+      socket.on('disconnect', () => {
+        status.textContent = 'WebSocket disconnected';
+      });
+
+      socket.on('message', (data) => {
+        const li = document.createElement('li');
+        li.textContent = '[' + (data.ts || new Date().toISOString()) + '] ' + data.from + ': ' + data.text;
+        list.appendChild(li);
+      });
+    </script>
+  </body>
+</html>
