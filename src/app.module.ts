@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { PuppeteerService } from './puppeteer.service';
 import { ConfigModule } from '@nestjs/config';
 import { MessagesModule } from './messages/messages.module';
+import { CloudflaredService } from './cloudflared.service';
 
 @Module({
   imports: [
@@ -13,6 +14,6 @@ import { MessagesModule } from './messages/messages.module';
     MessagesModule,
   ],
   controllers: [AppController],
-  providers: [AppService, PuppeteerService],
+  providers: [AppService, PuppeteerService, CloudflaredService],
 })
 export class AppModule {}

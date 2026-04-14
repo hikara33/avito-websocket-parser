@@ -14,6 +14,7 @@ export class PuppeteerService implements OnModuleInit, OnModuleDestroy {
   private watchdogTimer?: NodeJS.Timeout;
   private baseUrl = 'https://www.avito.ru/profile/messenger';
   private loginTimeoutMs = 180000;
+  private parserDebug = false;
 
   constructor(
     private readonly configService: ConfigService,
@@ -41,6 +42,7 @@ export class PuppeteerService implements OnModuleInit, OnModuleDestroy {
     const userDataDir = this.configService.get<string>('PUPPETEER_USER_DATA_DIR') ?? '.avito-profile';
     const executablePath = this.configService.get<string>('PUPPETEER_EXECUTABLE_PATH');
     this.loginTimeoutMs = Number(this.configService.get<string>('PUPPETEER_LOGIN_TIMEOUT_MS') ?? 180000);
+    this.parserDebug = this.configService.get<string>('PUPPETEER_DEBUG_PARSER') === 'true';
     const userAgent =
       this.configService.get<string>('PUPPETEER_USER_AGENT') ??
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36';
@@ -111,6 +113,11 @@ export class PuppeteerService implements OnModuleInit, OnModuleDestroy {
     await this.page.exposeFunction('emitIncomingMessage', (from: string, text: string) => {
       this.messagesService.publishMessage(from, text);
     });
+    await this.page.exposeFunction('emitParserDebug', (details: string) => {
+      if (this.parserDebug) {
+        this.messagesService.publishStatus('parser_debug', details);
+      }
+    });
   }
 
   private async gotoMessenger(): Promise<void> {
@@ -173,13 +180,20 @@ export class PuppeteerService implements OnModuleInit, OnModuleDestroy {
     }
 
     const normalizedSenders = this.targetSenders;
+    const debugMode = this.parserDebug;
 
-    await this.page.evaluate((targetSenders) => {
+    await this.page.evaluate((targetSenders, debug) => {
       const state = window as unknown as {
         __avitoListenerAttached?: boolean;
         __avitoProcessed?: Set<string>;
+        emitParserDebug?: (details: string) => Promise<void>;
       };
+      state.emitParserDebug =
+        (window as unknown as { emitParserDebug?: (details: string) => Promise<void> }).emitParserDebug;
       if (state.__avitoListenerAttached) {
+        if (debug && state.emitParserDebug) {
+          void state.emitParserDebug('listener already attached');
+        }
         return;
       }
       state.__avitoListenerAttached = true;
@@ -226,12 +240,18 @@ export class PuppeteerService implements OnModuleInit, OnModuleDestroy {
         );
 
         if (!from || !text) {
+          if (debug && state.emitParserDebug) {
+            void state.emitParserDebug('skip message: missing sender or text');
+          }
           return;
         }
 
         const fromNormalized = from.toLowerCase();
         const isTarget = targetSenders.some((sender) => fromNormalized.includes(sender));
         if (!isTarget) {
+          if (debug && state.emitParserDebug) {
+            void state.emitParserDebug(`skip sender: ${from}`);
+          }
           return;
         }
 
@@ -245,6 +265,9 @@ export class PuppeteerService implements OnModuleInit, OnModuleDestroy {
           return;
         }
         state.__avitoProcessed?.add(key);
+        if (debug && state.emitParserDebug) {
+          void state.emitParserDebug(`emit message from ${from}`);
+        }
 
         void (window as unknown as { emitIncomingMessage: (from: string, text: string) => Promise<void> }).emitIncomingMessage(
           from,
@@ -275,7 +298,7 @@ export class PuppeteerService implements OnModuleInit, OnModuleDestroy {
         childList: true,
         subtree: true,
       });
-    }, normalizedSenders);
+    }, normalizedSenders, debugMode);
   }
 
   private startWatchdog(): void {
