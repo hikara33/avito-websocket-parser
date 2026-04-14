@@ -66,9 +66,9 @@ export class PuppeteerService implements OnModuleInit, OnModuleDestroy {
 
     await this.createPage(userAgent);
     await this.gotoMessenger();
+    this.startWatchdog();
     await this.waitForMessenger(this.loginTimeoutMs);
     await this.attachRealtimeListener();
-    this.startWatchdog();
 
     this.publishStatus('ready', 'Puppeteer listener started');
     this.logger.log('Puppeteer listener started');
@@ -163,15 +163,34 @@ export class PuppeteerService implements OnModuleInit, OnModuleDestroy {
     this.publishStatus('waiting_auth', 'Waiting for messenger UI, log in manually if needed');
     this.logger.log('Waiting for messenger UI. Log in manually if needed.');
 
-    await this.page.waitForFunction(
-      () =>
-        Boolean(
-          document.querySelector('[data-marker="chat-list"]') ||
-            document.querySelector('[data-marker="messenger-chat-list"]'),
-        ),
-      { timeout: timeoutMs },
-    );
-    this.publishStatus('auth_ok', 'Messenger UI loaded');
+    try {
+      await this.page.waitForFunction(
+        () => {
+          const inMessenger = window.location.pathname.includes('/profile/messenger');
+          const hasLikelyMessengerUi = Boolean(
+            document.querySelector('[data-marker="chat-list"]') ||
+              document.querySelector('[data-marker="messenger-chat-list"]') ||
+              document.querySelector('[data-marker*="chat"]') ||
+              document.querySelector('[data-marker*="message"]') ||
+              document.querySelector('[class*="chat"]') ||
+              document.querySelector('[class*="message"]'),
+          );
+          return inMessenger && hasLikelyMessengerUi;
+        },
+        { timeout: timeoutMs },
+      );
+      this.publishStatus('auth_ok', 'Messenger UI loaded');
+    } catch {
+      const currentUrl = this.page.url();
+      if (currentUrl.includes('/profile/messenger')) {
+        this.publishStatus('auth_partial', 'Messenger URL opened, continuing with fallback mode');
+        this.logger.warn('Messenger selectors not found in time, continuing in fallback mode by URL.');
+        return;
+      }
+
+      this.publishStatus('waiting_auth', 'Still waiting for messenger UI');
+      throw new Error('Messenger page not ready yet');
+    }
   }
 
   private async attachRealtimeListener(): Promise<void> {
