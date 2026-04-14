@@ -1,0 +1,17 @@
+services:
+  app:
+    build: .
+    container_name: avito-websocket-parser
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+      PUPPETEER_USER_DATA_DIR: /app/.avito-profile
+    volumes:
+      - avito_profile:/app/.avito-profile
+    restart: unless-stopped
+
+volumes:
+  avito_profile:
